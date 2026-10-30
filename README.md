@@ -37,6 +37,14 @@ Akku: TP4056 OUT+ → 5V (rechts, 14. Pin), OUT− → GND (rechts, 13. Pin).
 
 Die Verkabelung ist bei beiden gleich.
 
+## Augen einstellen (Bluetooth)
+
+Die Firmware meldet sich per Bluetooth als **CreeperEyes**. Auf der Seite unter „Augen einstellen“
+lassen sich Augentyp (Mensch/Molch), Irisfarbe (nur RGB-OLED), Helligkeit, Pupillengröße,
+Pupillen-Bewegung, Blinzeln und Lidverfolgung live ändern. Die Werte liegen im Flash (NVS).
+
+GATT: Service `6e3b0001-4c1a-4f2e-9e0a-c0ffee000001`, Characteristic `6e3b0002-…` (16 Byte, siehe `cfgToBytes()`).
+
 ## Webflash
 
 Bei jedem Push auf `main` baut GitHub Actions die Firmware und veröffentlicht die Seite aus `docs/` auf GitHub Pages.
