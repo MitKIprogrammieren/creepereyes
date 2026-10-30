@@ -244,7 +244,7 @@
     if (!navigator.bluetooth) { status('Dieser Browser kann kein Bluetooth – bitte Chrome oder Edge verwenden'); return; }
     try {
       status('Suche Kopf …');
-      const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
+      const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }, { namePrefix: 'Creeper' }], optionalServices: [SVC] });
       dev.addEventListener('gattserverdisconnected', () => { chr = null; $('cfg-controls').hidden = true; status('Verbindung getrennt'); $('cfg-connect').textContent = 'Mit Kopf verbinden'; });
       const srv = await dev.gatt.connect();
       chr = await (await srv.getPrimaryService(SVC)).getCharacteristic(CHR);

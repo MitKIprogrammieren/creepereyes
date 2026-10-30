@@ -129,6 +129,7 @@ void setupConfig() {
   adv->addServiceUUID(CFG_SERVICE_UUID);
   adv->setScanResponse(true);
   BLEDevice::startAdvertising();
+  Serial.println("CreeperEyes: Bluetooth gestartet, Name 'CreeperEyes'");
 }
 
 // DISPLAY HARDWARE CONFIG -------------------------------------------------
@@ -525,6 +526,7 @@ void frame( // Process motion for a single frame of left or right eye
 
   // Pass all the derived values to the eye-rendering function:
   drawEye(eyeIndex, iScale, eyeX, eyeY, n, lThreshold);
+  vTaskDelay(1); // Bluetooth und System kurz Rechenzeit lassen (H2 hat nur einen Kern)
 }
 
 
