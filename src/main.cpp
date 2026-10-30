@@ -52,6 +52,8 @@ struct EyeConfig {
   uint8_t  tracking   = 1;    // 1 = Lider folgen der Pupille
   uint16_t irisMin    = 150;  // Pupille: kleinster Wert
   uint16_t irisMax    = 400;  // Pupille: groesster Wert
+  uint8_t  rotL       = 0;    // Drehung linkes Display: 0=0°, 1=90°, 2=180°, 3=270°
+  uint8_t  rotR       = 2;    // Drehung rechtes Display (Standard 180°)
 };
 EyeConfig cfg;
 volatile bool cfgDirty = true; // beim Start einmal anwenden
@@ -65,7 +67,7 @@ Preferences prefs;
 
 // Binaerformat (16 Byte, Little Endian):
 // 0 version, 1 style, 2 brightness, 3 tintOn, 4 R, 5 G, 6 B, 7 blinkTenths,
-// 8 tracking, 9-10 irisMin, 11-12 irisMax, 13 Variante (nur lesen), 14-15 frei
+// 8 tracking, 9-10 irisMin, 11-12 irisMax, 13 Variante (nur lesen), 14 rotL, 15 rotR
 void cfgToBytes(uint8_t *b) {
   memset(b, 0, 16);
   b[0] = CFG_VERSION; b[1] = cfg.style; b[2] = cfg.brightness; b[3] = cfg.tintOn;
@@ -74,6 +76,7 @@ void cfgToBytes(uint8_t *b) {
   b[9] = cfg.irisMin & 0xFF; b[10] = cfg.irisMin >> 8;
   b[11] = cfg.irisMax & 0xFF; b[12] = cfg.irisMax >> 8;
   b[13] = CFG_VARIANT;
+  b[14] = cfg.rotL; b[15] = cfg.rotR;
 }
 
 bool cfgFromBytes(const uint8_t *b, size_t len) {
@@ -90,6 +93,8 @@ bool cfgFromBytes(const uint8_t *b, size_t len) {
   if(n.irisMin < 50)   n.irisMin = 50;
   if(n.irisMax > 900)  n.irisMax = 900;
   if(n.irisMax < n.irisMin + 10) n.irisMax = n.irisMin + 10;
+  if(len >= 16) { n.rotL = b[14] & 3; n.rotR = b[15] & 3; }
+  else          { n.rotL = cfg.rotL; n.rotR = cfg.rotR; }
   cfg = n;
   return true;
 }
@@ -251,13 +256,13 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
 #endif
 #if defined(OLED_SSD1351)
   static uint16_t pBurst[SCREEN_WIDTH*SCREEN_HEIGHT]; // Ganzes Bild als RGB565
-  uint16_t burstIdx = 0;
 #endif
     
   // Set up raw pixel dump to entire screen.  Although such writes can wrap
   // around automatically from end of rect back to beginning, the region is
   // reset on each frame here in case of an SPI glitch.
 
+  const uint8_t rot = (e == 0) ? cfg.rotL : cfg.rotR; // 0, 90, 180, 270 Grad
   scleraXsave = scleraX; // Save initial X value to reset on each line
   irisY       = scleraY - (SCLERA_HEIGHT - IRIS_HEIGHT) / 2;
   for(screenY=0; screenY<SCREEN_HEIGHT; screenY++, scleraY++, irisY++) {
@@ -288,7 +293,16 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
         }
       }
 #if defined(OLED_SSD1351)
-      pBurst[burstIdx++] = p;
+      {
+        uint8_t ox, oy; // Zielpixel je nach Drehung
+        switch(rot) {
+          case 1:  ox = SCREEN_WIDTH - 1 - screenY; oy = screenX; break;
+          case 2:  ox = SCREEN_WIDTH - 1 - screenX; oy = SCREEN_HEIGHT - 1 - screenY; break;
+          case 3:  ox = screenY; oy = SCREEN_HEIGHT - 1 - screenX; break;
+          default: ox = screenX; oy = screenY;
+        }
+        pBurst[oy * SCREEN_WIDTH + ox] = p;
+      }
 #else
       // RGB565 -> 8-Bit-Helligkeit
       uint16_t r = (p >> 11) << 3, g = ((p >> 5) & 0x3F) << 2, b = (p & 0x1F) << 3;
@@ -301,7 +315,14 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
       else if(m < EDGE) lum = lum * m / EDGE;
       // Geordnetes Dithering auf 16 Stufen
       int32_t lv = (lum * 15 + bayer[screenY & 3][screenX & 3] * 16 + 8) / 255;
-      eye[e].display.drawPixel(screenX, screenY, lv > 15 ? 15 : lv);
+      uint8_t ox, oy; // Zielpixel je nach Drehung
+      switch(rot) {
+        case 1:  ox = SCREEN_WIDTH - 1 - screenY; oy = screenX; break;
+        case 2:  ox = SCREEN_WIDTH - 1 - screenX; oy = SCREEN_HEIGHT - 1 - screenY; break;
+        case 3:  ox = screenY; oy = SCREEN_HEIGHT - 1 - screenX; break;
+        default: ox = screenX; oy = screenY;
+      }
+      eye[e].display.drawPixel(ox, oy, lv > 15 ? 15 : lv);
 #endif
     }
   }

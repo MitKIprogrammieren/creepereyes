@@ -125,6 +125,10 @@
       <div class="cfg-row"><label for="cfg-blink">Blinzeln alle</label><input type="range" id="cfg-blink" min="0" max="20" step="1"><output id="o-blink"></output></div>
       <div class="cfg-row"><label>Lider folgen Pupille</label>
         <div class="seg" id="cfg-track"><button type="button" data-v="1" aria-pressed="true">An</button><button type="button" data-v="0" aria-pressed="false">Aus</button></div><output></output></div>
+      <div class="cfg-row"><label>Linkes Display drehen</label>
+        <div class="seg" id="cfg-rotl"><button type="button" data-v="0" aria-pressed="true">0°</button><button type="button" data-v="1" aria-pressed="false">90°</button><button type="button" data-v="2" aria-pressed="false">180°</button><button type="button" data-v="3" aria-pressed="false">270°</button></div><output></output></div>
+      <div class="cfg-row"><label>Rechtes Display drehen</label>
+        <div class="seg" id="cfg-rotr"><button type="button" data-v="0" aria-pressed="false">0°</button><button type="button" data-v="1" aria-pressed="false">90°</button><button type="button" data-v="2" aria-pressed="true">180°</button><button type="button" data-v="3" aria-pressed="false">270°</button></div><output></output></div>
       <button class="btn secondary" id="cfg-reset" type="button">Standardwerte</button>
     </div>
   </section>
@@ -182,15 +186,16 @@
   // ---- Augen einstellen per Web Bluetooth ----
   const SVC = '6e3b0001-4c1a-4f2e-9e0a-c0ffee000001', CHR = '6e3b0002-4c1a-4f2e-9e0a-c0ffee000001';
   const $ = id => document.getElementById(id);
-  const DEFAULTS = { style: 0, brightness: 100, tintOn: 0, r: 60, g: 140, b: 255, blinkTenths: 40, tracking: 1, irisMin: 150, irisMax: 400 };
+  const DEFAULTS = { style: 0, brightness: 100, tintOn: 0, r: 60, g: 140, b: 255, blinkTenths: 40, tracking: 1, irisMin: 150, irisMax: 400, rotL: 0, rotR: 2 };
   let chr = null, cfg = null, variant = 0, timer = null;
 
   const hex = c => '#' + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, '0')).join('');
   const parse = dv => ({ style: dv.getUint8(1), brightness: dv.getUint8(2), tintOn: dv.getUint8(3), r: dv.getUint8(4), g: dv.getUint8(5), b: dv.getUint8(6),
-    blinkTenths: dv.getUint8(7), tracking: dv.getUint8(8), irisMin: dv.getUint16(9, true), irisMax: dv.getUint16(11, true), variant: dv.getUint8(13) });
+    blinkTenths: dv.getUint8(7), tracking: dv.getUint8(8), irisMin: dv.getUint16(9, true), irisMax: dv.getUint16(11, true), variant: dv.getUint8(13),
+    rotL: dv.byteLength > 14 ? dv.getUint8(14) : 0, rotR: dv.byteLength > 15 ? dv.getUint8(15) : 2 });
   const pack = c => { const b = new DataView(new ArrayBuffer(16)); b.setUint8(0, 1); b.setUint8(1, c.style); b.setUint8(2, c.brightness); b.setUint8(3, c.tintOn);
     b.setUint8(4, c.r); b.setUint8(5, c.g); b.setUint8(6, c.b); b.setUint8(7, c.blinkTenths); b.setUint8(8, c.tracking);
-    b.setUint16(9, c.irisMin, true); b.setUint16(11, c.irisMax, true); return b.buffer; };
+    b.setUint16(9, c.irisMin, true); b.setUint16(11, c.irisMax, true); b.setUint8(14, c.rotL); b.setUint8(15, c.rotR); return b.buffer; };
 
   function status(text, ok) { $('cfg-status').textContent = text; $('cfg-status').classList.toggle('ok', !!ok); }
 
@@ -203,6 +208,8 @@
     $('cfg-color').value = hex(c); $('cfg-tint').checked = !!c.tintOn;
     document.querySelectorAll('#cfg-style button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === c.style)));
     document.querySelectorAll('#cfg-track button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === c.tracking)));
+    document.querySelectorAll('#cfg-rotl button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === c.rotL)));
+    document.querySelectorAll('#cfg-rotr button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === c.rotR)));
     $('cfg-tint-row').hidden = variant !== 1;
     outputs();
   }
@@ -258,7 +265,7 @@
   });
 
   ['cfg-bright', 'cfg-pupil', 'cfg-move', 'cfg-blink', 'cfg-color', 'cfg-tint'].forEach(id => $(id).addEventListener('input', send));
-  [['cfg-style', 'style'], ['cfg-track', 'tracking']].forEach(([id, key]) => $(id).addEventListener('click', e => {
+  [['cfg-style', 'style'], ['cfg-track', 'tracking'], ['cfg-rotl', 'rotL'], ['cfg-rotr', 'rotR']].forEach(([id, key]) => $(id).addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !cfg) return;
     cfg[key] = +b.dataset.v;
     document.querySelectorAll('#' + id + ' button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
