@@ -54,7 +54,7 @@
 <main>
   <div class="eyes" aria-hidden="true"><div class="eye"><div class="iris"></div></div><div class="eye"><div class="iris"></div></div></div>
   <h1>CreeperEyes Webflash</h1>
-  <p class="lead">Animierte Augen für den Frankenstein-Kopf auf dem ESP32-H2-DevKitM-1 mit zwei 1,5"-OLEDs (SSD1351).</p>
+  <p class="lead">Animierte Augen für den Frankenstein-Kopf auf dem Waveshare ESP32-H2-DEV-KIT-N4 mit zwei 1,5"-OLEDs (SSD1351).</p>
 
   <section class="card">
     <h2>Firmware installieren</h2>
@@ -69,10 +69,10 @@
   <section class="card">
     <h2>So geht's</h2>
     <ol>
-      <li>Board über die Buchse <code>USB-C UART</code> mit dem Computer verbinden.</li>
-      <li>Auf den Button klicken und den seriellen Port auswählen.</li>
+      <li>Board über seine USB-C-Buchse mit dem Computer verbinden.</li>
+      <li>Auf den Button klicken und den Port mit <code>CH343</code> im Namen auswählen.</li>
       <li>Bei der Frage nach dem Löschen <strong>„Löschen“</strong> bestätigen und warten, bis 100 % erreicht sind.</li>
-      <li>Klappt die Verbindung nicht: <code>BOOT</code> gedrückt halten, kurz <code>RESET</code> drücken, BOOT loslassen und erneut versuchen.</li>
+      <li>Klappt die Verbindung nicht: <code>BOOT</code> gedrückt halten, <code>RESET</code> drücken und loslassen, dann BOOT loslassen und erneut versuchen.</li>
       <li>Nach dem Flashen einmal <code>RESET</code> drücken – die Augen starten.</li>
     </ol>
   </section>
@@ -80,15 +80,15 @@
   <section class="card">
     <h2>Pinbelegung</h2>
     <table>
-      <tr><th>OLED</th><th>ESP32-H2</th><th>Leiste</th></tr>
-      <tr><td>VCC</td><td>3V3</td><td>J1-1</td></tr>
-      <tr><td>GND</td><td>G</td><td>J3-1</td></tr>
-      <tr><td>DIN</td><td>GPIO5</td><td>J1-10</td></tr>
-      <tr><td>CLK</td><td>GPIO4</td><td>J1-9</td></tr>
-      <tr><td>DC</td><td>GPIO10</td><td>J3-4</td></tr>
-      <tr><td>RST</td><td>GPIO11</td><td>J3-5</td></tr>
-      <tr><td>CS links</td><td>GPIO1</td><td>J1-4</td></tr>
-      <tr><td>CS rechts</td><td>GPIO0</td><td>J1-3</td></tr>
+      <tr><th>OLED</th><th>Aufdruck Platine</th><th>Lage (Stiftseite, USB unten)</th></tr>
+      <tr><td>VCC</td><td>3V3</td><td>rechts, 1. Pin</td></tr>
+      <tr><td>GND</td><td>GND</td><td>links, 1. Pin</td></tr>
+      <tr><td>DIN</td><td>IO5</td><td>rechts, 10. Pin</td></tr>
+      <tr><td>CLK</td><td>IO4</td><td>rechts, 9. Pin</td></tr>
+      <tr><td>DC</td><td>IO10</td><td>links, 4. Pin</td></tr>
+      <tr><td>RST</td><td>IO11</td><td>links, 5. Pin</td></tr>
+      <tr><td>CS links</td><td>IO1</td><td>rechts, 4. Pin</td></tr>
+      <tr><td>CS rechts</td><td>IO0</td><td>rechts, 3. Pin</td></tr>
     </table>
   </section>
 

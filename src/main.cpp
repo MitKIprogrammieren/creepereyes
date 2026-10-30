@@ -38,10 +38,10 @@ const uint16_t (*iris)[IRIS_MAP_WIDTH] = irisDefault;
 
 typedef Adafruit_SSD1351 displayType; // Using OLED display(s)
 
-#define DISPLAY_DC      10 // Data/command pin for BOTH displays (ESP32-H2: J3-4)
-#define DISPLAY_RESET   11 // Reset pin for BOTH displays (ESP32-H2: J3-5)
-#define SELECT_L_PIN    1  // LEFT eye chip select pin (ESP32-H2: J1-4)
-#define SELECT_R_PIN    0  // RIGHT eye chip select pin (ESP32-H2: J1-3)
+#define DISPLAY_DC      10 // Data/command pin for BOTH displays (Waveshare: IO10, links Pin 4)
+#define DISPLAY_RESET   11 // Reset pin for BOTH displays (Waveshare: IO11, links Pin 5)
+#define SELECT_L_PIN    1  // LEFT eye chip select pin (Waveshare: IO1, rechts Pin 4)
+#define SELECT_R_PIN    0  // RIGHT eye chip select pin (Waveshare: IO0, rechts Pin 3)
 #define UART_RX_PIN     12 // Pin to receive UART commands from controller (unused)
 
 // INPUT CONFIG (for eye motion -- enable or comment out as needed) --------
@@ -66,8 +66,8 @@ typedef struct {
   uint32_t startTime; // Time (micros) of last state change
 } eyeBlink;
 
-#define MOSI_PIN  5  // ESP32-H2: J1-10
-#define SCLK_PIN  4  // ESP32-H2: J1-9
+#define MOSI_PIN  5  // Waveshare: IO5, rechts Pin 10
+#define SCLK_PIN  4  // Waveshare: IO4, rechts Pin 9
 
 SPISettings settings(16000000, MSBFIRST, SPI_MODE3); // 26.667MHz seems reliable on the ESP32.
 struct {

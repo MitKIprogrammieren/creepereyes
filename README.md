@@ -1,6 +1,6 @@
 # CreeperEyes für ESP32-H2
 
-Port von [tooluser/CreeperEyes](https://github.com/tooluser/CreeperEyes) auf das **ESP32-H2-DevKitM-1 (N4)** mit zwei Waveshare 1,5"-OLEDs (SSD1351) für den Frankenstein-Kopf von Printables (Modell 620191).
+Port von [tooluser/CreeperEyes](https://github.com/tooluser/CreeperEyes) auf das **Waveshare ESP32-H2-DEV-KIT-N4** (pinkompatibel zum Espressif ESP32-H2-DevKitM-1) mit zwei Waveshare 1,5"-OLEDs (SSD1351) für den Frankenstein-Kopf von Printables (Modell 620191).
 
 ## Änderungen gegenüber dem Original
 
@@ -13,18 +13,18 @@ Port von [tooluser/CreeperEyes](https://github.com/tooluser/CreeperEyes) auf das
 
 ## Pinbelegung
 
-| OLED | ESP32-H2 | Leiste |
+| OLED | Aufdruck Platine | Lage (Stiftseite, USB unten) |
 |---|---|---|
-| VCC | 3V3 | J1-1 |
-| GND | G | J3-1 |
-| DIN | GPIO5 | J1-10 |
-| CLK | GPIO4 | J1-9 |
-| DC | GPIO10 | J3-4 |
-| RST | GPIO11 | J3-5 |
-| CS links | GPIO1 | J1-4 |
-| CS rechts | GPIO0 | J1-3 |
+| VCC | 3V3 | rechts, 1. Pin |
+| GND | GND | links, 1. Pin |
+| DIN | IO5 | rechts, 10. Pin |
+| CLK | IO4 | rechts, 9. Pin |
+| DC | IO10 | links, 4. Pin |
+| RST | IO11 | links, 5. Pin |
+| CS links | IO1 | rechts, 4. Pin |
+| CS rechts | IO0 | rechts, 3. Pin |
 
-Akku: TP4056 OUT+ → 5V (J1-14), OUT− → G (J1-13).
+Akku: TP4056 OUT+ → 5V (rechts, 14. Pin), OUT− → GND (rechts, 13. Pin).
 
 ## Webflash
 
