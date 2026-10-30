@@ -142,6 +142,11 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   int16_t  irisX, irisY;
   uint16_t p, a;
   uint32_t d;
+#if !defined(OLED_SSD1351)
+  // 4x4-Bayer-Matrix fuer geordnetes Dithering der 16 Graustufen
+  static const uint8_t bayer[4][4] = {{0,8,2,10},{12,4,14,6},{3,11,1,9},{15,7,13,5}};
+  const int16_t EDGE = 6; // Breite der weichen Lidkante in Lid-Einheiten
+#endif
 #if defined(OLED_SSD1351)
   static uint16_t pBurst[SCREEN_WIDTH*SCREEN_HEIGHT]; // Ganzes Bild als RGB565
   uint16_t burstIdx = 0;
@@ -157,7 +162,7 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
     scleraX = scleraXsave;
     irisX   = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
     for(screenX=0; screenX<SCREEN_WIDTH; screenX++, scleraX++, irisX++) {
-      int effectiveX = e == 1 ? screenX : SCREEN_WIDTH - screenX;
+      int effectiveX = e == 1 ? screenX : SCREEN_WIDTH - 1 - screenX; // -1: sonst Lesen hinter dem Array-Ende
       if((lower[screenY][effectiveX] <= lT) ||
          (upper[screenY][effectiveX] <= uT)) {             // Covered by eyelid
         p = 0;
@@ -177,9 +182,18 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
 #if defined(OLED_SSD1351)
       pBurst[burstIdx++] = p;
 #else
-      // RGB565 -> 4-Bit-Graustufe fuer das SSD1327
+      // RGB565 -> 8-Bit-Helligkeit
       uint16_t r = (p >> 11) << 3, g = ((p >> 5) & 0x3F) << 2, b = (p & 0x1F) << 3;
-      eye[e].display.drawPixel(screenX, screenY, ((r * 77 + g * 150 + b * 29) >> 8) >> 4);
+      int32_t lum = (r * 77 + g * 150 + b * 29) >> 8;
+      // Weiche Lidkante: Abstand zur Lidschwelle blendet die letzten Pixel aus
+      int16_t mL = (int16_t)lower[screenY][effectiveX] - lT;
+      int16_t mU = (int16_t)upper[screenY][effectiveX] - uT;
+      int16_t m  = mL < mU ? mL : mU;
+      if(m <= 0)        lum = 0;
+      else if(m < EDGE) lum = lum * m / EDGE;
+      // Geordnetes Dithering auf 16 Stufen
+      int32_t lv = (lum * 15 + bayer[screenY & 3][screenX & 3] * 16 + 8) / 255;
+      eye[e].display.drawPixel(screenX, screenY, lv > 15 ? 15 : lv);
 #endif
     }
   }
