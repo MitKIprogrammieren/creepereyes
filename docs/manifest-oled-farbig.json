@@ -1,0 +1,16 @@
+{
+  "name": "CreeperEyes für ESP32-H2 – farbiges RGB-OLED (SSD1351)",
+  "version": "1.1.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-H2",
+      "parts": [
+        {
+          "path": "firmware/creepereyes-esp32h2-oled-farbig.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

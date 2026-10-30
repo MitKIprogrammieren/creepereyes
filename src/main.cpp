@@ -34,9 +34,16 @@ const uint16_t (*iris)[IRIS_MAP_WIDTH] = irisDefault;
 
 // DISPLAY HARDWARE CONFIG -------------------------------------------------
 
-#include <Adafruit_SSD1327.h>  // Waveshare 1.5" OLED, 128x128, 16 Graustufen
-
-typedef Adafruit_SSD1327 displayType; // Using OLED display(s)
+// Display-Variante per Build-Flag: -DOLED_SSD1327 (grau) oder -DOLED_SSD1351 (farbig)
+#if defined(OLED_SSD1351)
+  #include <Adafruit_SSD1351.h>  // Waveshare 1.5" RGB OLED, 128x128, 65k Farben
+  typedef Adafruit_SSD1351 displayType;
+  #define MAKE_DISPLAY(cs) Adafruit_SSD1351(128, 128, &SPI, cs, DISPLAY_DC, -1)
+#else
+  #include <Adafruit_SSD1327.h>  // Waveshare 1.5" OLED, 128x128, 16 Graustufen
+  typedef Adafruit_SSD1327 displayType;
+  #define MAKE_DISPLAY(cs) Adafruit_SSD1327(128, 128, &SPI, DISPLAY_DC, -1, cs, 16000000UL)
+#endif
 
 #define DISPLAY_DC      10 // Data/command pin for BOTH displays (Waveshare: IO10, links Pin 4)
 #define DISPLAY_RESET   11 // Reset pin for BOTH displays (Waveshare: IO11, links Pin 5)
@@ -75,8 +82,8 @@ struct {
   eyeBlink    blink;   // Current blink state
 } eye[] = { // OK to comment out one of these for single-eye display:
   // displayType(SELECT_L_PIN,DISPLAY_DC,0),SELECT_L_PIN,{NOBLINK},
-  Adafruit_SSD1327(128, 128, &SPI, DISPLAY_DC, -1, SELECT_L_PIN, 16000000UL), SELECT_L_PIN,{NOBLINK},
-  Adafruit_SSD1327(128, 128, &SPI, DISPLAY_DC, -1, SELECT_R_PIN, 16000000UL), SELECT_R_PIN,{NOBLINK},
+  MAKE_DISPLAY(SELECT_L_PIN), SELECT_L_PIN,{NOBLINK},
+  MAKE_DISPLAY(SELECT_R_PIN), SELECT_R_PIN,{NOBLINK},
   // displayType(SELECT_R_PIN,DISPLAY_DC,0),SELECT_R_PIN,{NOBLINK},
 };
 #define NUM_EYES (sizeof(eye) / sizeof(eye[0]))
@@ -105,7 +112,11 @@ void setup(void) {
   }
   for(e=0; e<NUM_EYES; e++) {
     digitalWrite(eye[e].cs, LOW); // Select one eye for init
+#if defined(OLED_SSD1351)
+    eye[e].display.begin();
+#else
     eye[e].display.begin(0x3D, false); // SPI: Adresse egal, Reset schon erledigt
+#endif
     digitalWrite(eye[e].cs, HIGH); // Deselect
   }
   
@@ -131,6 +142,10 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
   int16_t  irisX, irisY;
   uint16_t p, a;
   uint32_t d;
+#if defined(OLED_SSD1351)
+  static uint16_t pBurst[SCREEN_WIDTH*SCREEN_HEIGHT]; // Ganzes Bild als RGB565
+  uint16_t burstIdx = 0;
+#endif
     
   // Set up raw pixel dump to entire screen.  Although such writes can wrap
   // around automatically from end of rect back to beginning, the region is
@@ -159,13 +174,30 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
           p = sclera[scleraY][scleraX];                 // Pixel = sclera
         }
       }
+#if defined(OLED_SSD1351)
+      pBurst[burstIdx++] = p;
+#else
       // RGB565 -> 4-Bit-Graustufe fuer das SSD1327
       uint16_t r = (p >> 11) << 3, g = ((p >> 5) & 0x3F) << 2, b = (p & 0x1F) << 3;
       eye[e].display.drawPixel(screenX, screenY, ((r * 77 + g * 150 + b * 29) >> 8) >> 4);
+#endif
     }
   }
   
+#if defined(OLED_SSD1351)
+  eye[e].display.startWrite();
+  eye[e].display.writeCommand(SSD1351_CMD_SETROW);    // Y range
+  eye[e].display.write16(0x0);
+  eye[e].display.write16(SCREEN_HEIGHT - 1);
+  eye[e].display.writeCommand(SSD1351_CMD_SETCOLUMN); // X range
+  eye[e].display.write16(0x0);
+  eye[e].display.write16(SCREEN_WIDTH  - 1);
+  eye[e].display.writeCommand(SSD1351_CMD_WRITERAM);  // Begin write
+  SPI.writePixels((uint8_t*)pBurst, sizeof(pBurst));
+  eye[e].display.endWrite();
+#else
   eye[e].display.display(); // Ganzes Bild per SPI uebertragen
+#endif
 }
 
 

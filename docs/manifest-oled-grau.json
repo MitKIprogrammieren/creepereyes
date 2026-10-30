@@ -1,0 +1,16 @@
+{
+  "name": "CreeperEyes für ESP32-H2 – graues OLED (SSD1327)",
+  "version": "1.1.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-H2",
+      "parts": [
+        {
+          "path": "firmware/creepereyes-esp32h2-oled-grau.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

@@ -28,6 +28,15 @@ Port von [tooluser/CreeperEyes](https://github.com/tooluser/CreeperEyes) auf das
 
 Akku: TP4056 OUT+ → 5V (rechts, 14. Pin), OUT− → GND (rechts, 13. Pin).
 
+## Display-Varianten
+
+| Variante | Display | PlatformIO-Umgebung |
+|---|---|---|
+| grau | Waveshare 1.5inch OLED Module (SSD1327, 16 Graustufen) | `oled-grau` |
+| farbig | Waveshare 1.5inch RGB OLED Module (SSD1351, 65k Farben) | `oled-farbig` |
+
+Die Verkabelung ist bei beiden gleich.
+
 ## Webflash
 
 Bei jedem Push auf `main` baut GitHub Actions die Firmware und veröffentlicht die Seite aus `docs/` auf GitHub Pages.
@@ -36,5 +45,5 @@ Einmalig unter **Settings → Pages → Source** „GitHub Actions“ auswählen
 ## Lokal bauen
 
 ```
-pio run -t upload
+pio run -e oled-grau -t upload    # oder -e oled-farbig
 ```

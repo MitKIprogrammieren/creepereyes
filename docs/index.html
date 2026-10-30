@@ -41,6 +41,16 @@
     padding: 14px 26px; font: 600 17px system-ui, sans-serif; cursor: pointer;
   }
   esp-web-install-button button[slot="activate"]:hover { filter: brightness(1.08); }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 520px) { .opts { grid-template-columns: 1fr; } }
+  .opt { display: block; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+  .opt input { position: absolute; opacity: 0; }
+  .opt:has(input:checked) { border-color: var(--accent); background: #1f2b1f; }
+  .opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .opt b { display: block; font-weight: 600; }
+  .opt span { color: var(--muted); font-size: 14px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; vertical-align: -2px; }
+  h3 { font-size: 16px; margin: 0 0 12px; }
   .note { color: var(--warn); margin: 14px 0 0; font-size: 15px; }
   table { width: 100%; border-collapse: collapse; font-size: 15px; }
   th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
@@ -54,11 +64,21 @@
 <main>
   <div class="eyes" aria-hidden="true"><div class="eye"><div class="iris"></div></div><div class="eye"><div class="iris"></div></div></div>
   <h1>CreeperEyes Webflash</h1>
-  <p class="lead">Animierte Augen für den Frankenstein-Kopf auf dem Waveshare ESP32-H2-DEV-KIT-N4 mit zwei Waveshare 1,5"-OLEDs (SSD1327, Graustufen).</p>
+  <p class="lead">Animierte Augen für den Frankenstein-Kopf auf dem Waveshare ESP32-H2-DEV-KIT-N4 mit zwei Waveshare 1,5"-OLEDs – grau oder farbig.</p>
 
   <section class="card">
     <h2>Firmware installieren</h2>
-    <esp-web-install-button manifest="manifest.json">
+    <h3>1. Display wählen</h3>
+    <div class="opts" role="radiogroup" aria-label="Display-Typ">
+      <label class="opt"><input type="radio" name="oled" value="oled-grau" checked>
+        <b><i class="sw" style="background:#9a9a9a"></i>Graues OLED</b>
+        <span>1.5inch OLED Module · SSD1327 · 16 Graustufen</span></label>
+      <label class="opt"><input type="radio" name="oled" value="oled-farbig">
+        <b><i class="sw" style="background:linear-gradient(90deg,#e05050,#50c050,#5080e0)"></i>Farbiges OLED</b>
+        <span>1.5inch RGB OLED Module · SSD1351 · 65 000 Farben</span></label>
+    </div>
+    <h3>2. Flashen</h3>
+    <esp-web-install-button id="installer" manifest="manifest-oled-grau.json">
       <button slot="activate">Mit ESP32-H2 verbinden und flashen</button>
       <span slot="unsupported"><p class="note">Dein Browser kann keine USB-Geräte ansprechen. Bitte Chrome oder Edge am Computer verwenden.</p></span>
       <span slot="not-allowed"><p class="note">Webflash funktioniert nur über HTTPS.</p></span>
@@ -91,6 +111,12 @@
       <tr><td>CS rechts</td><td>IO0</td><td>rechts, 3. Pin</td></tr>
     </table>
   </section>
+
+  <script>
+    const installer = document.getElementById('installer');
+    document.querySelectorAll('input[name="oled"]').forEach(r =>
+      r.addEventListener('change', () => { installer.manifest = `manifest-${r.value}.json`; }));
+  </script>
 
   <footer>Basierend auf <a href="https://github.com/tooluser/CreeperEyes">CreeperEyes</a> von Joshua Marker und Adafruits „Uncanny Eyes“. Geflasht wird mit <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a>.</footer>
 </main>
