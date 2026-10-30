@@ -34,9 +34,9 @@ const uint16_t (*iris)[IRIS_MAP_WIDTH] = irisDefault;
 
 // DISPLAY HARDWARE CONFIG -------------------------------------------------
 
-#include <Adafruit_SSD1351.h>  // OLED display library -OR-
+#include <Adafruit_SSD1327.h>  // Waveshare 1.5" OLED, 128x128, 16 Graustufen
 
-typedef Adafruit_SSD1351 displayType; // Using OLED display(s)
+typedef Adafruit_SSD1327 displayType; // Using OLED display(s)
 
 #define DISPLAY_DC      10 // Data/command pin for BOTH displays (Waveshare: IO10, links Pin 4)
 #define DISPLAY_RESET   11 // Reset pin for BOTH displays (Waveshare: IO11, links Pin 5)
@@ -69,15 +69,14 @@ typedef struct {
 #define MOSI_PIN  5  // Waveshare: IO5, rechts Pin 10
 #define SCLK_PIN  4  // Waveshare: IO4, rechts Pin 9
 
-SPISettings settings(16000000, MSBFIRST, SPI_MODE3); // 26.667MHz seems reliable on the ESP32.
 struct {
   displayType display; // OLED/TFT object
   uint8_t     cs;      // Chip select pin
   eyeBlink    blink;   // Current blink state
 } eye[] = { // OK to comment out one of these for single-eye display:
   // displayType(SELECT_L_PIN,DISPLAY_DC,0),SELECT_L_PIN,{NOBLINK},
-  Adafruit_SSD1351(128, 128, &SPI, SELECT_L_PIN, DISPLAY_DC, -1), SELECT_L_PIN,{NOBLINK},
-  Adafruit_SSD1351(128, 128, &SPI, SELECT_R_PIN, DISPLAY_DC, -1), SELECT_R_PIN,{NOBLINK},
+  Adafruit_SSD1327(128, 128, &SPI, DISPLAY_DC, -1, SELECT_L_PIN, 16000000UL), SELECT_L_PIN,{NOBLINK},
+  Adafruit_SSD1327(128, 128, &SPI, DISPLAY_DC, -1, SELECT_R_PIN, 16000000UL), SELECT_R_PIN,{NOBLINK},
   // displayType(SELECT_R_PIN,DISPLAY_DC,0),SELECT_R_PIN,{NOBLINK},
 };
 #define NUM_EYES (sizeof(eye) / sizeof(eye[0]))
@@ -106,7 +105,7 @@ void setup(void) {
   }
   for(e=0; e<NUM_EYES; e++) {
     digitalWrite(eye[e].cs, LOW); // Select one eye for init
-    eye[e].display.begin();
+    eye[e].display.begin(0x3D, false); // SPI: Adresse egal, Reset schon erledigt
     digitalWrite(eye[e].cs, HIGH); // Deselect
   }
   
@@ -130,9 +129,8 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
 
   uint8_t  screenX, screenY, scleraXsave;
   int16_t  irisX, irisY;
-  uint16_t p, a, burstIdx;
+  uint16_t p, a;
   uint32_t d;
-  static uint16_t pBurst[SCREEN_WIDTH*SCREEN_HEIGHT]; // Full frame buffer possible on ESP32
     
   // Set up raw pixel dump to entire screen.  Although such writes can wrap
   // around automatically from end of rect back to beginning, the region is
@@ -140,7 +138,6 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
 
   scleraXsave = scleraX; // Save initial X value to reset on each line
   irisY       = scleraY - (SCLERA_HEIGHT - IRIS_HEIGHT) / 2;
-  burstIdx = 0;
   for(screenY=0; screenY<SCREEN_HEIGHT; screenY++, scleraY++, irisY++) {
     scleraX = scleraXsave;
     irisX   = scleraXsave - (SCLERA_WIDTH - IRIS_WIDTH) / 2;
@@ -162,22 +159,13 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
           p = sclera[scleraY][scleraX];                 // Pixel = sclera
         }
       }
-      pBurst[burstIdx++] = p;
+      // RGB565 -> 4-Bit-Graustufe fuer das SSD1327
+      uint16_t r = (p >> 11) << 3, g = ((p >> 5) & 0x3F) << 2, b = (p & 0x1F) << 3;
+      eye[e].display.drawPixel(screenX, screenY, ((r * 77 + g * 150 + b * 29) >> 8) >> 4);
     }
   }
   
-  eye[e].display.startWrite();
-  eye[e].display.writeCommand(SSD1351_CMD_SETROW);    // Y range
-  eye[e].display.write16(0x0);
-  eye[e].display.write16(SCREEN_HEIGHT - 1);
-  eye[e].display.writeCommand(SSD1351_CMD_SETCOLUMN); // X range
-  eye[e].display.write16(0x0);
-  eye[e].display.write16(SCREEN_WIDTH  - 1);
-  eye[e].display.writeCommand(SSD1351_CMD_WRITERAM);  // Begin write
-
-  // For ESP32, use writePixels function to transfer the whole framebuffer in one large burst
-  SPI.writePixels((uint8_t*)pBurst, sizeof(pBurst));
-  eye[e].display.endWrite();
+  eye[e].display.display(); // Ganzes Bild per SPI uebertragen
 }
 
 

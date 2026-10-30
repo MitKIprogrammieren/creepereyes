@@ -2,6 +2,8 @@
 
 Port von [tooluser/CreeperEyes](https://github.com/tooluser/CreeperEyes) auf das **Waveshare ESP32-H2-DEV-KIT-N4** (pinkompatibel zum Espressif ESP32-H2-DevKitM-1) mit zwei Waveshare 1,5"-OLEDs (SSD1351) für den Frankenstein-Kopf von Printables (Modell 620191).
 
+**Display:** Waveshare 1.5inch OLED Module (SSD1327, 128×128, 16 Graustufen) im 4-Draht-SPI-Modus (BS1 = BS2 = 0, Werkseinstellung). Die Augen werden in Graustufen dargestellt.
+
 ## Änderungen gegenüber dem Original
 
 - Pins auf den ESP32-H2 umgelegt (siehe Tabelle)
