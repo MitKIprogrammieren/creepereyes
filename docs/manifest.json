@@ -1,0 +1,13 @@
+{
+  "name": "CreeperEyes für ESP32-H2",
+  "version": "1.0.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-H2",
+      "parts": [
+        { "path": "firmware/creepereyes-esp32h2.bin", "offset": 0 }
+      ]
+    }
+  ]
+}
