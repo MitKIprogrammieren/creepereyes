@@ -32,6 +32,105 @@ const uint8_t (*lower)[SCREEN_WIDTH] = lowerDefault;
 const uint16_t (*polar)[80] = polarDefault;
 const uint16_t (*iris)[IRIS_MAP_WIDTH] = irisDefault;
 
+// EINSTELLUNGEN (per Bluetooth aenderbar, im Flash gespeichert) -----------
+#include <Preferences.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+
+#define CFG_SERVICE_UUID "6e3b0001-4c1a-4f2e-9e0a-c0ffee000001"
+#define CFG_CHAR_UUID    "6e3b0002-4c1a-4f2e-9e0a-c0ffee000001"
+#define CFG_VERSION      1
+
+struct EyeConfig {
+  uint8_t  version    = CFG_VERSION;
+  uint8_t  style      = 0;    // 0 = menschlich, 1 = Molch
+  uint8_t  brightness = 100;  // 0..100 %
+  uint8_t  tintOn     = 0;    // 1 = Irisfarbe ueberschreiben (nur RGB-OLED sichtbar)
+  uint8_t  tintR = 60, tintG = 140, tintB = 255;
+  uint8_t  blinkTenths = 40;  // mittlerer Abstand zwischen Blinzeln in 0,1 s, 0 = nie
+  uint8_t  tracking   = 1;    // 1 = Lider folgen der Pupille
+  uint16_t irisMin    = 150;  // Pupille: kleinster Wert
+  uint16_t irisMax    = 400;  // Pupille: groesster Wert
+};
+EyeConfig cfg;
+volatile bool cfgDirty = true; // beim Start einmal anwenden
+Preferences prefs;
+
+#if defined(OLED_SSD1351)
+  #define CFG_VARIANT 1 // farbig
+#else
+  #define CFG_VARIANT 0 // grau
+#endif
+
+// Binaerformat (16 Byte, Little Endian):
+// 0 version, 1 style, 2 brightness, 3 tintOn, 4 R, 5 G, 6 B, 7 blinkTenths,
+// 8 tracking, 9-10 irisMin, 11-12 irisMax, 13 Variante (nur lesen), 14-15 frei
+void cfgToBytes(uint8_t *b) {
+  memset(b, 0, 16);
+  b[0] = CFG_VERSION; b[1] = cfg.style; b[2] = cfg.brightness; b[3] = cfg.tintOn;
+  b[4] = cfg.tintR; b[5] = cfg.tintG; b[6] = cfg.tintB; b[7] = cfg.blinkTenths;
+  b[8] = cfg.tracking;
+  b[9] = cfg.irisMin & 0xFF; b[10] = cfg.irisMin >> 8;
+  b[11] = cfg.irisMax & 0xFF; b[12] = cfg.irisMax >> 8;
+  b[13] = CFG_VARIANT;
+}
+
+bool cfgFromBytes(const uint8_t *b, size_t len) {
+  if(len < 13 || b[0] != CFG_VERSION) return false;
+  EyeConfig n;
+  n.style       = b[1] > 1 ? 0 : b[1];
+  n.brightness  = b[2] > 100 ? 100 : b[2];
+  n.tintOn      = b[3] ? 1 : 0;
+  n.tintR = b[4]; n.tintG = b[5]; n.tintB = b[6];
+  n.blinkTenths = b[7] > 200 ? 200 : b[7];
+  n.tracking    = b[8] ? 1 : 0;
+  n.irisMin     = b[9]  | (b[10] << 8);
+  n.irisMax     = b[11] | (b[12] << 8);
+  if(n.irisMin < 50)   n.irisMin = 50;
+  if(n.irisMax > 900)  n.irisMax = 900;
+  if(n.irisMax < n.irisMin + 10) n.irisMax = n.irisMin + 10;
+  cfg = n;
+  return true;
+}
+
+class CfgCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *c) override {
+    String v = c->getValue();
+    if(cfgFromBytes((const uint8_t *)v.c_str(), v.length())) {
+      prefs.putBytes("cfg", &cfg, sizeof(cfg));
+      cfgDirty = true;
+    }
+    uint8_t b[16]; cfgToBytes(b); c->setValue(b, 16);
+  }
+};
+
+class SrvCallbacks : public BLEServerCallbacks {
+  void onDisconnect(BLEServer *s) override { BLEDevice::startAdvertising(); }
+};
+
+void setupConfig() {
+  prefs.begin("eyes", false);
+  EyeConfig stored;
+  if(prefs.getBytesLength("cfg") == sizeof(EyeConfig)) {
+    prefs.getBytes("cfg", &stored, sizeof(stored));
+    if(stored.version == CFG_VERSION) cfg = stored;
+  }
+  BLEDevice::init("CreeperEyes");
+  BLEServer *server = BLEDevice::createServer();
+  server->setCallbacks(new SrvCallbacks());
+  BLEService *svc = server->createService(CFG_SERVICE_UUID);
+  BLECharacteristic *ch = svc->createCharacteristic(CFG_CHAR_UUID,
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  ch->setCallbacks(new CfgCallbacks());
+  uint8_t b[16]; cfgToBytes(b); ch->setValue(b, 16);
+  svc->start();
+  BLEAdvertising *adv = BLEDevice::getAdvertising();
+  adv->addServiceUUID(CFG_SERVICE_UUID);
+  adv->setScanResponse(true);
+  BLEDevice::startAdvertising();
+}
+
 // DISPLAY HARDWARE CONFIG -------------------------------------------------
 
 // Display-Variante per Build-Flag: -DOLED_SSD1327 (grau) oder -DOLED_SSD1351 (farbig)
@@ -53,10 +152,11 @@ const uint16_t (*iris)[IRIS_MAP_WIDTH] = irisDefault;
 
 // INPUT CONFIG (for eye motion -- enable or comment out as needed) --------
 
-#define TRACKING          // If enabled, eyelid tracks pupil
+#define TRACKING          // Lidverfolgung grundsaetzlich einbauen, an/aus ueber cfg.tracking
 #define IRIS_SMOOTH       // If enabled, filter input from IRIS_PIN
-#define IRIS_MIN      150 // Clip lower analogRead() range from IRIS_PIN (WAS: 120) - Reduced range so that it doesn't look to odd with multiple eye pairs
-#define IRIS_MAX      400 // Clip upper "                                (WAS: 720) - Reduced range so that it doesn't look to odd with multiple eye pairs
+// IRIS_MIN/IRIS_MAX kommen jetzt aus cfg.irisMin/cfg.irisMax
+//#define IRIS_MIN      150 // Clip lower analogRead() range from IRIS_PIN (WAS: 120) - Reduced range so that it doesn't look to odd with multiple eye pairs
+//#define IRIS_MAX      400 // Clip upper "                                (WAS: 720) - Reduced range so that it doesn't look to odd with multiple eye pairs
 #define AUTOBLINK        // If enabled, eyes blink autonomously
 
 // Probably don't need to edit any config below this line, -----------------
@@ -124,6 +224,7 @@ void setup(void) {
   // eyelid handling in the drawEye() function -- no need for distinct
   // L-to-R or R-to-L inner loops.  Just the X coordinate of the iris is
   // then reversed when drawing this eye, so they move the same.  Magic!
+  setupConfig(); // Gespeicherte Einstellungen laden, Bluetooth starten
   // eye[0].display.writeCommand(SSD1351_CMD_SETREMAP);
   // eye[0].display.write16(0x76);
 }
@@ -175,6 +276,12 @@ void drawEye( // Renders one eye.  Inputs must be pre-clipped & valid.
         if(d < IRIS_MAP_HEIGHT) {                       // Within iris area
           a = (IRIS_MAP_WIDTH * (p >> 7)) / 512;        // Angle (X)
           p = iris[d][a];                               // Pixel = iris
+          if(cfg.tintOn) { // Iris neu einfaerben: Helligkeit behalten, Farbe aus cfg
+            uint16_t ir = (p >> 11) << 3, ig = ((p >> 5) & 0x3F) << 2, ib = (p & 0x1F) << 3;
+            uint16_t L  = (ir * 77 + ig * 150 + ib * 29) >> 8;
+            uint16_t nr = (L * cfg.tintR) >> 8, ng = (L * cfg.tintG) >> 8, nb = (L * cfg.tintB) >> 8;
+            p = ((nr >> 3) << 11) | ((ng >> 2) << 5) | (nb >> 3);
+          }
         } else {                                        // Not in iris
           p = sclera[scleraY][scleraX];                 // Pixel = sclera
         }
@@ -243,6 +350,24 @@ uint32_t timeOfLastBlink = 0L, timeToNextBlink = 0L;
 #define SER_CMD_SIZE 9
 uint16_t serAddr = 1;
 
+// Einstellungen anwenden (im Hauptprogramm, nicht im Bluetooth-Task)
+void applyConfig() {
+  cfgDirty = false;
+  if(cfg.style == 1) {
+    sclera = scleraNewt; upper = upperNewt; lower = lowerNewt; polar = polarNewt; iris = irisNewt;
+  } else {
+    sclera = scleraDefault; upper = upperDefault; lower = lowerDefault; polar = polarDefault; iris = irisDefault;
+  }
+  for(uint8_t e = 0; e < NUM_EYES; e++) {
+#if defined(OLED_SSD1351)
+    uint8_t mc = (uint16_t)cfg.brightness * 15 / 100; // Master-Contrast 0..15
+    eye[e].display.sendCommand(0xC7, &mc, 1);
+#else
+    eye[e].display.setContrast((uint16_t)cfg.brightness * 255 / 100);
+#endif
+  }
+}
+
 void frame( // Process motion for a single frame of left or right eye
   uint16_t        iScale) {     // Iris scale (0-1023) passed in
   static uint32_t frames   = 0; // Used in frame rate calculation
@@ -254,6 +379,7 @@ void frame( // Process motion for a single frame of left or right eye
   static uint16_t serNewEyeCtrl = 0;
   static uint16_t serEyeCtrl = 0;
 
+  if(cfgDirty) applyConfig();
   if(++eyeIndex >= NUM_EYES) eyeIndex = 0; // Cycle through eyes, 1 per call
 
   // X/Y movement
@@ -312,7 +438,7 @@ void frame( // Process motion for a single frame of left or right eye
 #ifdef AUTOBLINK
   // Similar to the autonomous eye movement above -- blink start times
   // and durations are random (within ranges).
-  if((t - timeOfLastBlink) >= timeToNextBlink) { // Start new blink?
+  if(cfg.blinkTenths && (t - timeOfLastBlink) >= timeToNextBlink) { // Start new blink?
     timeOfLastBlink = t;
     uint32_t blinkDuration = random(36000, 72000); // ~1/28 - ~1/14 sec
     // Set up durations for both eyes (if not already winking)
@@ -323,7 +449,7 @@ void frame( // Process motion for a single frame of left or right eye
         eye[e].blink.duration  = blinkDuration;
       }
     }
-    timeToNextBlink = blinkDuration * 3 + random(4000000);
+    timeToNextBlink = blinkDuration * 3 + random((uint32_t)cfg.blinkTenths * 200000UL); // Mittel = Einstellung
   }
 #endif
 
@@ -372,7 +498,8 @@ void frame( // Process motion for a single frame of left or right eye
   int16_t sampleX = SCLERA_WIDTH  / 2 - (eyeX / 2), // Reduce X influence
           sampleY = SCLERA_HEIGHT / 2 - (eyeY + IRIS_HEIGHT / 4);
   // Eyelid is slightly asymmetrical, so two readings are taken, averaged
-  if(sampleY < 0) n = 0;
+  if(!cfg.tracking) n = 0;
+  else if(sampleY < 0) n = 0;
   else            n = (upper[sampleY][sampleX] +
                        upper[sampleY][SCREEN_WIDTH - 1 - sampleX]) / 2;
   uThreshold = (uThreshold * 3 + n) / 4; // Filter/soften motion
@@ -405,7 +532,7 @@ void frame( // Process motion for a single frame of left or right eye
 // Autonomous iris motion uses a fractal behavior to similate both the major
 // reaction of the eye plus the continuous smaller adjustments that occur.
 
-uint16_t oldIris = (IRIS_MIN + IRIS_MAX) / 2, newIris;
+uint16_t oldIris = 275, newIris;
 
 void split( // Subdivides motion path into two sub-paths w/randomization
   int16_t  startValue, // Iris scale value (IRIS_MIN to IRIS_MAX) at start
@@ -426,8 +553,8 @@ void split( // Subdivides motion path into two sub-paths w/randomization
     int16_t v;         // Interim value
     while((dt = (micros() - startTime)) < duration) {
       v = startValue + (((endValue - startValue) * dt) / duration);
-      if(v < IRIS_MIN)      v = IRIS_MIN; // Clip just in case
-      else if(v > IRIS_MAX) v = IRIS_MAX;
+      if(v < (int16_t)cfg.irisMin)      v = cfg.irisMin; // Clip just in case
+      else if(v > (int16_t)cfg.irisMax) v = cfg.irisMax;
       frame(v);        // Draw frame w/interim iris scale value
     }
   }
@@ -439,8 +566,8 @@ void loop() {
 
 // Autonomous iris scaling -- invoke recursive function
 
-  newIris = random(IRIS_MIN, IRIS_MAX);
+  newIris = random(cfg.irisMin, cfg.irisMax);
   
-  split(oldIris, newIris, micros(), 10000000L, IRIS_MAX - IRIS_MIN);
+  split(oldIris, newIris, micros(), 10000000L, cfg.irisMax - cfg.irisMin);
   oldIris = newIris;
 }
